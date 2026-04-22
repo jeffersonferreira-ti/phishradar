@@ -9,6 +9,14 @@ def test_neutral_text_returns_low_risk_without_reasons() -> None:
     assert analysis.reasons == []
 
 
+def test_empty_text_returns_low_risk_without_reasons() -> None:
+    analysis = analyze_content("   ")
+
+    assert analysis.score == 0
+    assert analysis.label == "LOW_RISK"
+    assert analysis.reasons == []
+
+
 def test_urgency_language_increases_score() -> None:
     analysis = analyze_content("Urgent: verify now to keep your account active.")
 

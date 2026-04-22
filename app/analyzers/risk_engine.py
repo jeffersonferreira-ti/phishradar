@@ -1,15 +1,33 @@
 from dataclasses import dataclass
 import re
+from typing import Literal
 import unicodedata
 from urllib.parse import urlparse
+
+
+RiskLabel = Literal["LOW_RISK", "SUSPICIOUS", "HIGH_RISK"]
 
 
 @dataclass(frozen=True)
 class RiskAnalysis:
     score: int
-    label: str
+    label: RiskLabel
     reasons: list[str]
 
+
+MAX_SCORE = 100
+URGENCY_SCORE = 25
+URL_SHORTENER_SCORE = 25
+SUSPICIOUS_DOMAIN_SCORE = 40
+CREDENTIAL_PAYMENT_SCORE = 40
+
+SUSPICIOUS_THRESHOLD = 35
+HIGH_RISK_THRESHOLD = 70
+
+URGENCY_REASON = "Message uses urgent language to pressure the recipient."
+URL_SHORTENER_REASON = "Message contains a URL shortening service."
+SUSPICIOUS_DOMAIN_REASON = "Message contains a suspicious domain pattern."
+CREDENTIAL_PAYMENT_REASON = "Message requests credentials or payment action."
 
 SHORTENER_DOMAINS: set[str] = {
     "bit.ly",
@@ -41,37 +59,45 @@ DOMAIN_PATTERN = re.compile(
 
 
 def analyze_content(content: str) -> RiskAnalysis:
-    normalized_content = _normalize_text(content)
+    normalized_content = _normalize_text(content.strip())
+
+    if not normalized_content:
+        return _build_analysis(score=0, reasons=[])
+
     score = 0
     reasons: list[str] = []
 
-    if _contains_any(normalized_content, URGENCY_PATTERNS):
-        score += 25
-        reasons.append("Message uses urgent language to pressure the recipient.")
+    if _contains_pattern(normalized_content, URGENCY_PATTERNS):
+        score += URGENCY_SCORE
+        reasons.append(URGENCY_REASON)
 
-    domains = _extract_domains(content)
+    domains = _extract_unique_domains(content)
 
     if _has_url_shortener(domains):
-        score += 25
-        reasons.append("Message contains a URL shortening service.")
+        score += URL_SHORTENER_SCORE
+        reasons.append(URL_SHORTENER_REASON)
 
     if _has_suspicious_domain_pattern(domains):
-        score += 40
-        reasons.append("Message contains a suspicious domain pattern.")
+        score += SUSPICIOUS_DOMAIN_SCORE
+        reasons.append(SUSPICIOUS_DOMAIN_REASON)
 
-    if _contains_any(normalized_content, CREDENTIAL_PAYMENT_PATTERNS):
-        score += 40
-        reasons.append("Message requests credentials or payment action.")
+    if _contains_pattern(normalized_content, CREDENTIAL_PAYMENT_PATTERNS):
+        score += CREDENTIAL_PAYMENT_SCORE
+        reasons.append(CREDENTIAL_PAYMENT_REASON)
 
-    final_score = min(score, 100)
+    return _build_analysis(score=score, reasons=reasons)
+
+
+def _build_analysis(score: int, reasons: list[str]) -> RiskAnalysis:
+    capped_score = min(score, MAX_SCORE)
     return RiskAnalysis(
-        score=final_score,
-        label=_label_for_score(final_score),
-        reasons=reasons,
+        score=capped_score,
+        label=_label_for_score(capped_score),
+        reasons=reasons.copy(),
     )
 
 
-def _contains_any(content: str, patterns: tuple[str, ...]) -> bool:
+def _contains_pattern(content: str, patterns: tuple[str, ...]) -> bool:
     return any(pattern.casefold() in content for pattern in patterns)
 
 
@@ -82,7 +108,7 @@ def _normalize_text(content: str) -> str:
     )
 
 
-def _extract_domains(content: str) -> list[str]:
+def _extract_unique_domains(content: str) -> list[str]:
     domains: list[str] = []
     seen_domains: set[str] = set()
 
@@ -110,10 +136,14 @@ def _append_domain(domains: list[str], seen_domains: set[str], domain: str) -> N
 
 def _has_url_shortener(domains: list[str]) -> bool:
     return any(
-        domain == shortener or domain.endswith(f".{shortener}")
+        _is_url_shortener_domain(domain, shortener)
         for domain in domains
         for shortener in SHORTENER_DOMAINS
     )
+
+
+def _is_url_shortener_domain(domain: str, shortener: str) -> bool:
+    return domain == shortener or domain.endswith(f".{shortener}")
 
 
 def _has_suspicious_domain_pattern(domains: list[str]) -> bool:
@@ -142,11 +172,11 @@ def _is_suspicious_domain(domain: str) -> bool:
     )
 
 
-def _label_for_score(score: int) -> str:
-    if score >= 70:
+def _label_for_score(score: int) -> RiskLabel:
+    if score >= HIGH_RISK_THRESHOLD:
         return "HIGH_RISK"
 
-    if score >= 35:
+    if score >= SUSPICIOUS_THRESHOLD:
         return "SUSPICIOUS"
 
     return "LOW_RISK"
