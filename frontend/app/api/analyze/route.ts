@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import type { AnalyzeRequest, AnalyzeResponse } from "@/types/analysis";
 
-const BACKEND_BASE_URL =
-  process.env.PHISHRADAR_API_BASE_URL ?? "http://127.0.0.1:8000";
+const BACKEND_BASE_URL = process.env.PHISHRADAR_API_BASE_URL;
 
 export async function POST(request: Request) {
   let body: AnalyzeRequest;
@@ -20,8 +19,16 @@ export async function POST(request: Request) {
     );
   }
 
+  if (!BACKEND_BASE_URL) {
+    return NextResponse.json(
+      { error: "PHISHRADAR_API_BASE_URL is not configured." },
+      { status: 500 },
+    );
+  }
+
   try {
-    const backendResponse = await fetch(`${BACKEND_BASE_URL}/analyze`, {
+    const backendUrl = new URL("/analyze", BACKEND_BASE_URL);
+    const backendResponse = await fetch(backendUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -12,7 +12,7 @@ export async function analyzeContent(
   });
 
   if (!response.ok) {
-    throw new Error("Analysis request failed.");
+    throw new Error(`Analysis request failed with status ${response.status}.`);
   }
 
   return response.json() as Promise<AnalyzeResponse>;

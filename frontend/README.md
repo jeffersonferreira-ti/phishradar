@@ -14,12 +14,12 @@ Start the frontend from this directory:
 
 ```bash
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
-The frontend uses `http://127.0.0.1:8000` as the default backend URL.
-Override it with:
+Configure the backend URL with:
 
 ```bash
-PHISHRADAR_API_BASE_URL=http://127.0.0.1:8000 npm run dev
+PHISHRADAR_API_BASE_URL=http://localhost:8000
 ```

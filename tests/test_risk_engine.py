@@ -27,6 +27,16 @@ def test_urgency_language_increases_score() -> None:
     ]
 
 
+def test_multiple_urgency_terms_count_as_one_category() -> None:
+    analysis = analyze_content("Urgent! Verify now")
+
+    assert analysis.score == 25
+    assert analysis.label == "LOW_RISK"
+    assert analysis.reasons == [
+        "Message uses urgent language to pressure the recipient."
+    ]
+
+
 def test_url_shortener_increases_score() -> None:
     analysis = analyze_content("Review the document at https://bit.ly/example.")
 
