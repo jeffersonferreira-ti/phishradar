@@ -15,6 +15,14 @@ class RiskAnalysis:
     reasons: list[str]
 
 
+@dataclass(frozen=True)
+class RuleEvaluation:
+    matched: bool
+    score: int
+    reason: str | None
+    category: str
+
+
 MAX_SCORE = 100
 URGENCY_SCORE = 25
 URL_SHORTENER_SCORE = 25
@@ -126,45 +134,28 @@ def analyze_content(content: str) -> RiskAnalysis:
     if not normalized_content:
         return _build_analysis(score=0, reasons=[])
 
-    score = 0
+    total_score = 0
     reasons: list[str] = []
-
-    if _contains_pattern(normalized_content, URGENCY_PATTERNS):
-        score += URGENCY_SCORE
-        reasons.append(URGENCY_REASON)
 
     domains = _extract_unique_domains(content)
     parsed_urls = _extract_urls(content)
 
-    if _has_url_shortener(domains):
-        score += URL_SHORTENER_SCORE
-        reasons.append(URL_SHORTENER_REASON)
+    # Each evaluator owns one rule and returns a normalized result shape.
+    # This keeps the public API stable while making it straightforward to add
+    # future rule categories, breakdowns, or correlation logic.
+    for evaluation in _evaluate_rules(
+        normalized_content=normalized_content,
+        domains=domains,
+        urls=parsed_urls,
+    ):
+        if not evaluation.matched:
+            continue
 
-    if _has_suspicious_domain_pattern(domains):
-        score += SUSPICIOUS_DOMAIN_SCORE
-        reasons.append(SUSPICIOUS_DOMAIN_REASON)
+        total_score += evaluation.score
+        if evaluation.reason is not None:
+            reasons.append(evaluation.reason)
 
-    if _contains_pattern(normalized_content, CREDENTIAL_PAYMENT_PATTERNS):
-        score += CREDENTIAL_PAYMENT_SCORE
-        reasons.append(CREDENTIAL_PAYMENT_REASON)
-
-    if _has_suspicious_url_keywords(parsed_urls):
-        score += SUSPICIOUS_URL_KEYWORD_SCORE
-        reasons.append(SUSPICIOUS_URL_KEYWORD_REASON)
-
-    if _has_high_risk_tld_in_sensitive_context(parsed_urls):
-        score += HIGH_RISK_TLD_SCORE
-        reasons.append(HIGH_RISK_TLD_REASON)
-
-    if _has_brand_lookalike(parsed_urls):
-        score += BRAND_LOOKALIKE_SCORE
-        reasons.append(BRAND_LOOKALIKE_REASON)
-
-    if _has_suspicious_url_structure(parsed_urls):
-        score += SUSPICIOUS_URL_STRUCTURE_SCORE
-        reasons.append(SUSPICIOUS_URL_STRUCTURE_REASON)
-
-    return _build_analysis(score=score, reasons=reasons)
+    return _build_analysis(score=total_score, reasons=reasons)
 
 
 def _build_analysis(score: int, reasons: list[str]) -> RiskAnalysis:
@@ -226,6 +217,111 @@ def _append_domain(domains: list[str], seen_domains: set[str], domain: str) -> N
     if normalized_domain not in seen_domains:
         domains.append(normalized_domain)
         seen_domains.add(normalized_domain)
+
+
+def _evaluate_rules(
+    *,
+    normalized_content: str,
+    domains: list[str],
+    urls: list[str],
+) -> tuple[RuleEvaluation, ...]:
+    return (
+        _evaluate_urgency_rule(normalized_content),
+        _evaluate_url_shortener_rule(domains),
+        _evaluate_suspicious_domain_rule(domains),
+        _evaluate_credential_payment_rule(normalized_content),
+        _evaluate_suspicious_url_keyword_rule(urls),
+        _evaluate_high_risk_tld_rule(urls),
+        _evaluate_brand_lookalike_rule(urls),
+        _evaluate_suspicious_url_structure_rule(urls),
+    )
+
+
+def _evaluation(
+    *,
+    matched: bool,
+    score: int,
+    reason: str | None,
+    category: str,
+) -> RuleEvaluation:
+    return RuleEvaluation(
+        matched=matched,
+        score=score if matched else 0,
+        reason=reason if matched else None,
+        category=category,
+    )
+
+
+def _evaluate_urgency_rule(normalized_content: str) -> RuleEvaluation:
+    return _evaluation(
+        matched=_contains_pattern(normalized_content, URGENCY_PATTERNS),
+        score=URGENCY_SCORE,
+        reason=URGENCY_REASON,
+        category="urgency",
+    )
+
+
+def _evaluate_url_shortener_rule(domains: list[str]) -> RuleEvaluation:
+    return _evaluation(
+        matched=_has_url_shortener(domains),
+        score=URL_SHORTENER_SCORE,
+        reason=URL_SHORTENER_REASON,
+        category="url_shortener",
+    )
+
+
+def _evaluate_suspicious_domain_rule(domains: list[str]) -> RuleEvaluation:
+    return _evaluation(
+        matched=_has_suspicious_domain_pattern(domains),
+        score=SUSPICIOUS_DOMAIN_SCORE,
+        reason=SUSPICIOUS_DOMAIN_REASON,
+        category="suspicious_domain",
+    )
+
+
+def _evaluate_credential_payment_rule(normalized_content: str) -> RuleEvaluation:
+    return _evaluation(
+        matched=_contains_pattern(normalized_content, CREDENTIAL_PAYMENT_PATTERNS),
+        score=CREDENTIAL_PAYMENT_SCORE,
+        reason=CREDENTIAL_PAYMENT_REASON,
+        category="credential_payment",
+    )
+
+
+def _evaluate_suspicious_url_keyword_rule(urls: list[str]) -> RuleEvaluation:
+    return _evaluation(
+        matched=_has_suspicious_url_keywords(urls),
+        score=SUSPICIOUS_URL_KEYWORD_SCORE,
+        reason=SUSPICIOUS_URL_KEYWORD_REASON,
+        category="suspicious_url_keyword",
+    )
+
+
+def _evaluate_high_risk_tld_rule(urls: list[str]) -> RuleEvaluation:
+    return _evaluation(
+        matched=_has_high_risk_tld_in_sensitive_context(urls),
+        score=HIGH_RISK_TLD_SCORE,
+        reason=HIGH_RISK_TLD_REASON,
+        category="high_risk_tld",
+    )
+
+
+def _evaluate_brand_lookalike_rule(urls: list[str]) -> RuleEvaluation:
+    return _evaluation(
+        matched=_has_brand_lookalike(urls),
+        score=BRAND_LOOKALIKE_SCORE,
+        reason=BRAND_LOOKALIKE_REASON,
+        category="brand_lookalike",
+    )
+
+
+def _evaluate_suspicious_url_structure_rule(urls: list[str]) -> RuleEvaluation:
+    return _evaluation(
+        matched=_has_suspicious_url_structure(urls),
+        score=SUSPICIOUS_URL_STRUCTURE_SCORE,
+        reason=SUSPICIOUS_URL_STRUCTURE_REASON,
+        category="suspicious_url_structure",
+    )
 
 
 def _has_url_shortener(domains: list[str]) -> bool:
