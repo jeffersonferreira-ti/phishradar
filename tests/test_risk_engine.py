@@ -111,6 +111,58 @@ def test_brand_lookalike_detection_flags_leetspeak_domain() -> None:
     ]
 
 
+def test_brand_mismatch_detects_brand_mention_with_non_official_domain() -> None:
+    analysis = analyze_content(
+        "Your PayPal account needs review: https://secure-check.example.com"
+    )
+
+    assert analysis.score == 38
+    assert analysis.label == "MODERATE"
+    assert analysis.reasons == [
+        "URL contains suspicious phishing-related keywords.",
+        "Message mentions Paypal but linked URLs do not use its official domains.",
+    ]
+
+
+def test_brand_mismatch_does_not_trigger_for_official_brand_domain() -> None:
+    analysis = analyze_content(
+        "Google security notice: https://accounts.google.com/verify"
+    )
+
+    assert analysis.score == 20
+    assert analysis.label == "MODERATE"
+    assert analysis.reasons == [
+        "URL contains suspicious phishing-related keywords.",
+        "URL structure includes suspicious phishing-related patterns.",
+    ]
+
+
+def test_brand_mismatch_supports_multiword_brands() -> None:
+    analysis = analyze_content(
+        "Mercado Pago alerta importante: https://billing-check.example.com"
+    )
+
+    assert analysis.score == 38
+    assert analysis.label == "MODERATE"
+    assert analysis.reasons == [
+        "URL contains suspicious phishing-related keywords.",
+        "Message mentions Mercado Pago but linked URLs do not use its official domains.",
+    ]
+
+
+def test_brand_mismatch_and_brand_lookalike_can_both_trigger() -> None:
+    analysis = analyze_content("PayPal support: https://paypa1.com/login")
+
+    assert analysis.score == 75
+    assert analysis.label == "HIGH_RISK"
+    assert analysis.reasons == [
+        "URL contains suspicious phishing-related keywords.",
+        "URL appears to mimic a known brand name.",
+        "Message mentions Paypal but linked URLs do not use its official domains.",
+        "URL structure includes suspicious phishing-related patterns.",
+    ]
+
+
 def test_suspicious_query_parameters_raise_structure_signal() -> None:
     analysis = analyze_content(
         "https://example.com/home?session=abc123&redirect=login&token=xyz"

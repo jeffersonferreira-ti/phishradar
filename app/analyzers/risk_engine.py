@@ -35,6 +35,7 @@ SUSPICIOUS_URL_STRUCTURE_SCORE = 12
 URGENCY_SENSITIVE_ACTION_CORRELATION_SCORE = 20
 SHORTENER_SENSITIVE_ACTION_CORRELATION_SCORE = 20
 SUSPICIOUS_DOMAIN_SENSITIVE_ACTION_CORRELATION_SCORE = 15
+BRAND_MISMATCH_SCORE = 30
 
 MODERATE_THRESHOLD = 20
 SUSPICIOUS_THRESHOLD = 45
@@ -117,6 +118,21 @@ KNOWN_BRANDS: tuple[str, ...] = (
     "amazon",
     "netflix",
 )
+
+OFFICIAL_BRAND_DOMAINS: dict[str, tuple[str, ...]] = {
+    "paypal": ("paypal.com",),
+    "google": ("google.com", "accounts.google.com"),
+    "microsoft": ("microsoft.com", "live.com", "outlook.com"),
+    "amazon": ("amazon.com", "amazon.com.br"),
+    "nubank": ("nubank.com.br",),
+    "itau": ("itau.com.br",),
+    "bradesco": ("bradesco.com.br",),
+    "santander": ("santander.com.br",),
+    "caixa": ("caixa.gov.br",),
+    "mercado pago": ("mercadopago.com.br", "mercadopago.com"),
+    "correios": ("correios.com.br",),
+    "govbr": ("gov.br",),
+}
 
 SUSPICIOUS_QUERY_KEYS: set[str] = {
     "token",
@@ -260,6 +276,7 @@ def _evaluate_rules(
         _evaluate_suspicious_url_keyword_rule(urls),
         _evaluate_high_risk_tld_rule(urls),
         _evaluate_brand_lookalike_rule(urls),
+        _evaluate_brand_mismatch_rule(normalized_content, urls),
         _evaluate_suspicious_url_structure_rule(urls),
         _evaluate_urgency_sensitive_action_correlation_rule(
             normalized_content=normalized_content,
@@ -353,6 +370,22 @@ def _evaluate_brand_lookalike_rule(urls: list[str]) -> RuleEvaluation:
         score=BRAND_LOOKALIKE_SCORE,
         reason=BRAND_LOOKALIKE_REASON,
         category="brand_lookalike",
+    )
+
+
+def _evaluate_brand_mismatch_rule(
+    normalized_content: str,
+    urls: list[str],
+) -> RuleEvaluation:
+    mismatched_brand = _find_brand_mismatch(normalized_content, urls)
+
+    return _evaluation(
+        matched=mismatched_brand is not None,
+        score=BRAND_MISMATCH_SCORE,
+        reason=_brand_mismatch_reason(mismatched_brand)
+        if mismatched_brand is not None
+        else None,
+        category="brand_mismatch",
     )
 
 
@@ -481,11 +514,65 @@ def _has_suspicious_url_structure(urls: list[str]) -> bool:
     return any(_url_has_suspicious_structure(url) for url in urls)
 
 
+def _find_brand_mismatch(normalized_content: str, urls: list[str]) -> str | None:
+    if not urls:
+        return None
+
+    hostnames = _extract_url_hostnames(urls)
+    if not hostnames:
+        return None
+
+    for brand, official_domains in OFFICIAL_BRAND_DOMAINS.items():
+        if not _content_mentions_brand(normalized_content, brand):
+            continue
+
+        if any(
+            _hostname_matches_official_domain(hostname, official_domain)
+            for hostname in hostnames
+            for official_domain in official_domains
+        ):
+            continue
+
+        return brand
+
+    return None
+
+
 def _has_sensitive_action(*, normalized_content: str, urls: list[str]) -> bool:
     return (
         _contains_pattern(normalized_content, CREDENTIAL_PAYMENT_PATTERNS)
         or _has_suspicious_url_keywords(urls)
         or _has_suspicious_url_structure(urls)
+    )
+
+
+def _content_mentions_brand(normalized_content: str, brand: str) -> bool:
+    brand_pattern = re.compile(rf"\b{re.escape(brand)}\b")
+    return brand_pattern.search(normalized_content) is not None
+
+
+def _extract_url_hostnames(urls: list[str]) -> list[str]:
+    hostnames: list[str] = []
+    seen_hostnames: set[str] = set()
+
+    for url in urls:
+        hostname = (urlparse(url).hostname or "").casefold()
+        if not hostname or hostname in seen_hostnames:
+            continue
+
+        hostnames.append(hostname)
+        seen_hostnames.add(hostname)
+
+    return hostnames
+
+
+def _hostname_matches_official_domain(hostname: str, official_domain: str) -> bool:
+    return hostname == official_domain or hostname.endswith(f".{official_domain}")
+
+
+def _brand_mismatch_reason(brand: str) -> str:
+    return (
+        f"Message mentions {brand.title()} but linked URLs do not use its official domains."
     )
 
 
