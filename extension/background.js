@@ -6,6 +6,10 @@ const BADGE_CONFIG = {
     text: "LOW",
     color: "#15803d"
   },
+  MODERATE: {
+    text: "MOD",
+    color: "#ea580c"
+  },
   SUSPICIOUS: {
     text: "WARN",
     color: "#ca8a04"
