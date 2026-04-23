@@ -28,8 +28,15 @@ export default function Home() {
     try {
       const analysis = await analyzeContent({ content });
       setResult(analysis);
-    } catch {
-      setError("Unable to analyze the content right now.");
+    } catch (error) {
+      const developmentDetail =
+        process.env.NODE_ENV === "development" && error instanceof Error
+          ? ` (${error.message})`
+          : "";
+
+      setError(
+        `Could not analyze the content. Please try again.${developmentDetail}`,
+      );
     } finally {
       setIsLoading(false);
     }
@@ -40,8 +47,8 @@ export default function Home() {
       <section className="header">
         <h1>PhishRadar</h1>
         <p>
-          Paste a message, URL, or raw e-mail content to check phishing and
-          fraud risk signals from the local API.
+          Paste a message, URL, or raw e-mail content to analyze phishing and
+          fraud risk signals.
         </p>
       </section>
 
