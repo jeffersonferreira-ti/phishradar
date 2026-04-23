@@ -1,4 +1,5 @@
 const API_BASE_URL = "https://phishradar-production.up.railway.app";
+const CACHE_KEY_PREFIX = "analysis:";
 
 const analyzeTabButton = document.getElementById("analyze-tab-button");
 const analyzeTextButton = document.getElementById("analyze-text-button");
@@ -8,6 +9,14 @@ const resultElement = document.getElementById("result");
 const scoreValueElement = document.getElementById("score-value");
 const labelValueElement = document.getElementById("label-value");
 const reasonsListElement = document.getElementById("reasons-list");
+
+function getCacheKey(url) {
+  return `${CACHE_KEY_PREFIX}${url}`;
+}
+
+function isSupportedUrl(url) {
+  return typeof url === "string" && /^https?:\/\//i.test(url);
+}
 
 function setLoading(isLoading, message) {
   analyzeTabButton.disabled = isLoading;
@@ -22,7 +31,7 @@ function showError(message) {
   statusElement.classList.add("error");
 }
 
-function showResult(result) {
+function showResult(result, message) {
   scoreValueElement.textContent = String(result.score);
   labelValueElement.textContent = result.label;
   reasonsListElement.innerHTML = "";
@@ -40,8 +49,25 @@ function showResult(result) {
   }
 
   resultElement.classList.remove("hidden");
-  statusElement.textContent = "Analysis complete.";
+  statusElement.textContent = message || "Analysis complete.";
   statusElement.classList.remove("error");
+}
+
+async function getCachedAnalysis(url) {
+  const cacheKey = getCacheKey(url);
+  const stored = await chrome.storage.local.get(cacheKey);
+  return stored[cacheKey] || null;
+}
+
+async function saveCachedAnalysis(url, result) {
+  const cacheKey = getCacheKey(url);
+  await chrome.storage.local.set({
+    [cacheKey]: {
+      url,
+      result,
+      analyzedAt: Date.now()
+    }
+  });
 }
 
 async function analyzeContent(content) {
@@ -60,15 +86,15 @@ async function analyzeContent(content) {
   return response.json();
 }
 
-async function getCurrentTabUrl() {
+async function getCurrentTab() {
   const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
   const [activeTab] = tabs;
 
-  if (!activeTab || !activeTab.url) {
-    throw new Error("Could not read the current tab URL.");
+  if (!activeTab) {
+    throw new Error("Could not read the current tab.");
   }
 
-  return activeTab.url;
+  return activeTab;
 }
 
 async function runAnalysis(content, loadingMessage) {
@@ -96,10 +122,55 @@ async function runAnalysis(content, loadingMessage) {
   }
 }
 
+async function analyzeUrlWithCache(url, loadingMessage) {
+  const cachedAnalysis = await getCachedAnalysis(url);
+
+  if (cachedAnalysis?.result) {
+    showResult(cachedAnalysis.result, "Loaded cached analysis for this page.");
+    return;
+  }
+
+  setLoading(true, loadingMessage);
+  const result = await analyzeContent(url);
+  await saveCachedAnalysis(url, result);
+  showResult(result, "Analysis complete.");
+}
+
+async function loadActiveTabAnalysis() {
+  try {
+    const activeTab = await getCurrentTab();
+    const tabUrl = activeTab.url;
+
+    if (!isSupportedUrl(tabUrl)) {
+      statusElement.textContent = "Open an http(s) page to see automatic analysis.";
+      resultElement.classList.add("hidden");
+      return;
+    }
+
+    await analyzeUrlWithCache(tabUrl, "Analyzing current page...");
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Could not load the current page analysis.";
+    showError(message);
+  } finally {
+    analyzeTabButton.disabled = false;
+    analyzeTextButton.disabled = false;
+  }
+}
+
 analyzeTabButton.addEventListener("click", async () => {
   try {
-    const tabUrl = await getCurrentTabUrl();
-    await runAnalysis(tabUrl, "Analyzing current tab...");
+    const activeTab = await getCurrentTab();
+    const tabUrl = activeTab.url;
+
+    if (!isSupportedUrl(tabUrl)) {
+      showError("Open a valid http(s) tab before analyzing.");
+      return;
+    }
+
+    await analyzeUrlWithCache(tabUrl, "Analyzing current tab...");
   } catch (error) {
     const message =
       error instanceof Error
@@ -112,3 +183,5 @@ analyzeTabButton.addEventListener("click", async () => {
 analyzeTextButton.addEventListener("click", async () => {
   await runAnalysis(manualContentInput.value, "Analyzing text...");
 });
+
+loadActiveTabAnalysis();
