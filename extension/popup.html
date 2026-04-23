@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PhishRadar</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main class="popup">
+      <h1>PhishRadar</h1>
+
+      <button id="analyze-tab-button" type="button">Analyze Current Tab</button>
+
+      <label class="field-label" for="manual-content">Paste text or URL</label>
+      <textarea
+        id="manual-content"
+        rows="7"
+        placeholder="Paste a message, URL, or email content here."
+      ></textarea>
+
+      <button id="analyze-text-button" type="button">Analyze Text</button>
+
+      <p id="status" class="status" aria-live="polite"></p>
+
+      <section id="result" class="result hidden" aria-live="polite">
+        <div class="result-row">
+          <span class="result-label">Score</span>
+          <strong id="score-value">-</strong>
+        </div>
+        <div class="result-row">
+          <span class="result-label">Label</span>
+          <strong id="label-value">-</strong>
+        </div>
+        <div>
+          <span class="result-label">Reasons</span>
+          <ul id="reasons-list" class="reasons-list"></ul>
+        </div>
+      </section>
+    </main>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

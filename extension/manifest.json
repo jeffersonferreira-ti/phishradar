@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "PhishRadar",
+  "version": "0.1.0",
+  "description": "Analyze the current tab URL or pasted text for phishing risk.",
+  "permissions": ["activeTab", "tabs"],
+  "host_permissions": ["https://phishradar-production.up.railway.app/*"],
+  "action": {
+    "default_title": "PhishRadar",
+    "default_popup": "popup.html"
+  }
+}
