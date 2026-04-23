@@ -4,14 +4,14 @@
 <img src="https://img.shields.io/badge/FastAPI-Backend-009688?style=for-the-badge&logo=fastapi&logoColor=white"/>
 <img src="https://img.shields.io/badge/Next.js-Frontend-000000?style=for-the-badge&logo=nextdotjs&logoColor=white"/>
 <img src="https://img.shields.io/badge/Chrome%20Extension-MV3-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white"/>
-<img src="https://img.shields.io/badge/Focus-Phishing%20Risk%20Analysis-8E24AA?style=for-the-badge"/>
-<img src="https://img.shields.io/badge/Status-M9%20Complete-00C853?style=for-the-badge"/>
+<img src="https://img.shields.io/badge/Focus-Phishing%20Detection%20Engine-8E24AA?style=for-the-badge"/>
+<img src="https://img.shields.io/badge/Status-Advanced%20Engine-00C853?style=for-the-badge"/>
 
 <br/><br/>
 
 # PhishRadar
 
-**Ferramenta full stack para análise heurística de phishing, fraude e URLs suspeitas**
+**Full-stack phishing detection platform with explainable scoring, correlation rules, and browser-assisted analysis**
 
 *Analyze. Explain. Prevent.*
 
@@ -19,107 +19,118 @@
 
 ---
 
-## O Problema
+## Project Overview
 
-Phishing continua explorando sinais simples, mas eficazes: urgência, links manipulados, domínios enganosos e pedidos indevidos de credenciais.
+PhishRadar is a security-focused project that analyzes suspicious text and URLs through an explainable phishing risk engine. What started as a simple heuristic analyzer has evolved into a more capable detection layer that combines message content, URL structure, domain traits, brand signals, and multi-signal correlations.
 
-| Problema | Impacto |
-|---|---|
-| URLs suspeitas podem parecer legítimas à primeira vista | Aumenta a chance de clique indevido |
-| Mensagens com urgência induzem ação impulsiva | Reduz a avaliação crítica do usuário |
-| Domínios lookalike confundem marcas confiáveis com imitações | Facilita roubo de credenciais |
-| Usuários nem sempre têm contexto técnico para avaliar risco | A decisão fica lenta ou imprecisa |
+The platform returns a deterministic risk assessment designed for debugging, calibration, and product presentation:
 
----
+- `score`: final risk score from `0` to `100`
+- `label`: final classification (`LOW_RISK`, `MODERATE`, `SUSPICIOUS`, `HIGH_RISK`)
+- `reasons`: human-readable explanations for triggered signals
+- `breakdown`: category-level score attribution for explainability
 
-## A Solução
-
-O **PhishRadar** entrega uma análise explicável e determinística de conteúdo suspeito via API, web app e extensão Chrome.
-
-O sistema recebe texto, URL ou conteúdo bruto de e-mail e retorna:
-
-- `score`: pontuação de risco de `0` a `100`
-- `label`: classificação final (`LOW_RISK`, `SUSPICIOUS`, `HIGH_RISK`)
-- `reasons`: sinais identificados que explicam a decisão
-
-Além da análise manual, a extensão também executa análise automática da página ativa, atualiza badge dinamicamente e reutiliza cache por URL.
+PhishRadar is exposed through a FastAPI backend, a Next.js web interface, and a Chrome extension that can analyze the active page and surface risk through a badge.
 
 ---
 
-## Pipeline
+## Key Features
+
+### Detection Engine
+
+- explainable and deterministic phishing scoring
+- hybrid detection across content, URLs, domains, brand signals, and correlation rules
+- improved calibration with a four-level risk model
+- category-level score breakdown for debugging and tuning
+- focused coverage for real-world phishing and scam narratives
+
+---
+
+### Explainability
+
+- explicit `reasons` for every matched signal
+- structured `breakdown` by scoring family:
+  - `content_score`
+  - `url_score`
+  - `domain_score`
+  - `brand_score`
+  - `correlation_score`
+- stable output that is easy to inspect in tests, demos, and portfolio reviews
+
+---
+
+### Delivery Surfaces
+
+- FastAPI analysis API for programmatic use
+- Next.js web app for manual analysis
+- Chrome extension with badge-based risk feedback and cached URL results
+
+---
+
+## How It Works
 
 ```text
-Texto/URL -> FastAPI /analyze -> Risk Engine Heurístico -> Score -> Label -> Reasons -> Web App / Chrome Extension
+Text/URL -> FastAPI /analyze -> Risk Engine -> Base Signals + Correlation Rules -> Score + Label + Reasons + Breakdown -> Web App / Chrome Extension
 ```
 
----
+High-level engine flow:
 
-## Funcionalidades
-
-### Backend e Risk Engine
-
-- API FastAPI com rotas de health check e análise
-- motor heurístico determinístico e explicável
-- scoring por categorias com thresholds previsíveis
-- resposta padronizada para todos os clientes
+1. Normalize message content and extract URLs and domains.
+2. Evaluate base rules across content, URL, domain, and brand signals.
+3. Apply additive correlation rules when risky signals appear together.
+4. Aggregate raw category totals into a final score, then cap at `MAX_SCORE = 100`.
+5. Return the final risk label, matched reasons, and score breakdown.
 
 ---
 
-### Heurísticas de Risco
+## Risk Levels Explanation
 
-Detecta sinais como:
+| Score | Label | Meaning |
+|---|---|---|
+| 0-19 | `LOW_RISK` | No meaningful phishing indicators or only weak isolated signals |
+| 20-44 | `MODERATE` | Noticeable suspicious behavior that merits review |
+| 45-69 | `SUSPICIOUS` | Multi-signal phishing characteristics are present |
+| 70+ | `HIGH_RISK` | Strong or correlated phishing indicators with high confidence |
 
-- linguagem de urgência
-- encurtadores de URL
-- padrões suspeitos de domínio
-- pedidos de credenciais ou pagamento
-- keywords suspeitas na URL
-- TLDs de maior risco em contexto sensível
-- brand lookalikes simples com substituições visuais
-- estrutura suspeita de path e query params
-
-Cada regra adiciona score de forma controlada e com motivo explícito no resultado.
+The final score is capped at `100`. The `breakdown` remains uncapped by category so calibration work can see which signal families drove the raw total.
 
 ---
 
-### Web App
+## Detection Capabilities
 
-- interface em Next.js + TypeScript para análise manual
-- integração com backend via rota server-side
-- exibição clara de score, label e reasons
-- tratamento simples de loading e erro
+PhishRadar currently covers a practical set of phishing and scam scenarios, including:
 
----
+- urgency and pressure-based language
+- credential or payment requests
+- URL shorteners in suspicious contexts
+- suspicious domain traits and risky URL structures
+- sensitive URL keywords and high-risk TLD usage
+- brand lookalike domains such as visual substitutions
+- brand mismatch between message content and linked domains
+- additive correlation rules such as:
+  - urgency + sensitive action
+  - shortener + sensitive action
+  - suspicious domain + sensitive action
+- Brazilian scam narratives involving:
+  - delivery retention
+  - pending fees
+  - customs and Correios scams
+  - PIX release payments
+  - account update and device confirmation messages
 
-### Extensão Chrome
-
-- análise manual da aba atual
-- análise manual de texto ou URL colado
-- análise automática ao trocar de página
-- badge dinâmica baseada no risco retornado pela API
-- cache por URL em `chrome.storage.local`
-
----
-
-### Risk Scoring
-
-| Score | Classificação |
-|---|---|
-| 0-34 | LOW_RISK |
-| 35-69 | SUSPICIOUS |
-| 70+ | HIGH_RISK |
+This makes the engine useful for real-world scenarios such as payment phishing, account takeover lures, fake delivery notices, domain impersonation, and mixed-signal social engineering attempts.
 
 ---
 
-## Caso de Uso
+## Example API Response
 
-### Entrada
+### Input
 
 ```text
-Urgent: confirm your password at https://login-secure-account-update.example.com now.
+Urgent PayPal notice: entrega retida. Confirm your password at https://bit.ly/login now.
 ```
 
-### Saída
+### Output
 
 ```json
 {
@@ -127,125 +138,48 @@ Urgent: confirm your password at https://login-secure-account-update.example.com
   "label": "HIGH_RISK",
   "reasons": [
     "Message uses urgent language to pressure the recipient.",
-    "Message contains a suspicious domain pattern.",
     "Message requests credentials or payment action.",
-    "URL contains suspicious phishing-related keywords."
-  ]
+    "Content matches common Brazilian delivery, fee, or payment scam patterns.",
+    "Message contains a URL shortening service.",
+    "URL contains suspicious phishing-related keywords.",
+    "URL structure includes suspicious phishing-related patterns.",
+    "Message mentions Paypal but linked URLs do not use its official domains.",
+    "Urgent language is combined with a sensitive action request.",
+    "A URL shortener is combined with a sensitive action signal."
+  ],
+  "breakdown": {
+    "content_score": 55,
+    "url_score": 30,
+    "domain_score": 0,
+    "brand_score": 30,
+    "correlation_score": 40
+  }
 }
 ```
 
 ---
 
-## Stack
+## Tech Stack
 
-| Camada | Tecnologia |
+| Layer | Technology |
 |---|---|
-| Backend | FastAPI, Pydantic, Uvicorn |
-| Risk Engine | Python, heurísticas determinísticas |
-| Testes | pytest |
+| Backend API | FastAPI, Pydantic, Uvicorn |
+| Risk Engine | Python, deterministic scoring rules |
+| Testing | pytest |
 | Frontend | Next.js, React, TypeScript |
-| Extensão | Chrome Extension, Manifest V3, JavaScript |
-| Deploy | Railway e Vercel |
+| Browser Extension | Chrome Extension, Manifest V3, JavaScript |
+| Deployment | Railway, Vercel |
 
 ---
 
-## Produção
+## Production
 
 - Web app: https://phishradar.vercel.app
 - Backend API: https://phishradar-production.up.railway.app
 
 ---
 
-## Como Rodar Localmente
-
-### Backend
-
-```bash
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-```
-
-Backend local:
-
-```text
-http://localhost:8000
-```
-
-Rotas principais:
-
-- `GET /health`
-- `POST /analyze`
-
----
-
-### Frontend
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Configure `frontend/.env.local`:
-
-```text
-PHISHRADAR_API_BASE_URL=http://localhost:8000
-```
-
-Frontend local:
-
-```text
-http://localhost:3000
-```
-
----
-
-### Extensão Chrome
-
-A extensão fica em [`extension/`](/c:/Users/jluiz/Documents/GitHub/phishradar/extension).
-
-Para carregar localmente:
-
-1. Acesse `chrome://extensions`
-2. Ative `Developer mode`
-3. Clique em `Load unpacked`
-4. Selecione a pasta `extension/`
-
-Comportamento atual:
-
-- popup com análise manual
-- leitura automática do resultado da URL ativa
-- badge dinâmica por nível de risco
-- cache local por URL
-
----
-
-## Testes
-
-### Backend
-
-```bash
-pytest
-```
-
-### Frontend
-
-```bash
-cd frontend
-npm run typecheck
-npm run build
-```
-
-### Extensão
-
-Validação atual:
-
-- carregamento local no Chrome
-- checagem de sintaxe dos scripts
-
----
-
-## Arquitetura
+## Architecture
 
 ```text
 phishradar/
@@ -284,57 +218,59 @@ phishradar/
 
 ## Screenshots
 
-Espaço reservado para imagens do projeto:
+Reserved space for portfolio visuals:
 
-- web app com formulário de análise
-- resultado `LOW_RISK`
-- resultado `HIGH_RISK`
-- popup da extensão com análise automática
-- badge da extensão nos estados `LOW_RISK`, `SUSPICIOUS` e `HIGH_RISK`
+- web app analysis form
+- `LOW_RISK` result view
+- `MODERATE` and `HIGH_RISK` result views
+- extension popup with automatic analysis
+- extension badge across multiple risk levels
 
 ---
 
-## Limitações
+## Limitations
 
-- não usa machine learning
-- não consulta reputação externa
-- não faz análise de histórico de navegação
-- não substitui análise humana em contexto real de incidentes
+- no machine learning or reputation feeds
+- no external threat intelligence enrichment
+- no mailbox-native email parsing pipeline yet
+- no behavioral or historical browsing analysis
+- not a replacement for human review in incident response workflows
 
 ---
 
 ## Roadmap
 
-| Versão | Foco | Status |
+| Version | Focus | Status |
 |---|---|---|
-| M1-M4 | Backend, engine inicial e API | Concluído |
-| M5-M6 | Web app em Next.js | Concluído |
-| M7-M9 | Extensão Chrome, automação, badge e cache | Concluído |
-| Próximo | Screenshots, testes de integração e novos sinais de e-mail | Planejado |
+| M1-M4 | Initial backend, API, and rule engine | Completed |
+| M5-M6 | Next.js web interface | Completed |
+| M7-M9 | Chrome extension, badge logic, and caching | Completed |
+| Current | Correlation rules, calibration, brand mismatch, BR scam coverage, explainable breakdown | Completed |
+| Next | Additional email signals, richer UI visualization, broader scenario coverage | Planned |
 
 ---
 
-## Objetivo
+## Objective
 
-Demonstrar:
+PhishRadar demonstrates:
 
-- desenvolvimento full stack com FastAPI e Next.js
-- construção de um risk engine explicável e determinístico
-- integração entre backend, frontend e extensão Chrome
-- uso de Manifest V3 em um fluxo de análise automática
-- deploy desacoplado entre Railway e Vercel
-
----
-
-## Resumo do Projeto
-
-O PhishRadar mostra como um produto de segurança enxuto pode combinar regras heurísticas, API bem definida e múltiplas interfaces sem depender de serviços externos ou modelos complexos.
-
-O resultado é um MVP funcional, testável e claro para portfólio técnico.
+- security-oriented backend engineering with FastAPI
+- design of an explainable phishing detection engine
+- calibration-aware scoring and regression-tested rule evolution
+- integration across API, web application, and Chrome extension
+- product-minded security tooling suitable for portfolio presentation
 
 ---
 
-## 👨‍💻Desenvolvido por **Jefferson Ferreira**.
+## Project Summary
+
+PhishRadar shows how a lean security product can move beyond basic heuristics into a more mature phishing detection engine without relying on opaque models. The result is a practical system that favors explainability, engineering clarity, and realistic threat scenarios over black-box scoring.
+
+It is designed to be both demo-ready and technically inspectable: every major risk signal is visible, attributable, and testable.
+
+---
+
+## Developed by **Jefferson Ferreira**
 
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Connect-0A66C2?style=flat&logo=linkedin)](https://www.linkedin.com/in/jefferson-ferreira-ti/)
 [![GitHub](https://img.shields.io/badge/GitHub-Follow-181717?style=flat&logo=github)](https://github.com/jeffersonferreira-ti)
