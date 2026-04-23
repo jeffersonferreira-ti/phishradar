@@ -1,39 +1,125 @@
 <div align="center">
 
+<img src="https://img.shields.io/badge/Python-3.12+-3776AB?style=for-the-badge&logo=python&logoColor=white"/>
+<img src="https://img.shields.io/badge/FastAPI-Backend-009688?style=for-the-badge&logo=fastapi&logoColor=white"/>
+<img src="https://img.shields.io/badge/Next.js-Frontend-000000?style=for-the-badge&logo=nextdotjs&logoColor=white"/>
+<img src="https://img.shields.io/badge/Chrome%20Extension-MV3-4285F4?style=for-the-badge&logo=googlechrome&logoColor=white"/>
+<img src="https://img.shields.io/badge/Focus-Phishing%20Risk%20Analysis-8E24AA?style=for-the-badge"/>
+<img src="https://img.shields.io/badge/Status-M9%20Complete-00C853?style=for-the-badge"/>
+
+<br/><br/>
+
 # PhishRadar
 
-**Phishing and fraud risk analysis across API, web app, and Chrome extension**
+**Ferramenta full stack para análise heurística de phishing, fraude e URLs suspeitas**
 
-Paste text, inspect URLs, and surface deterministic risk signals with clear explanations.
+*Analyze. Explain. Prevent.*
 
 </div>
 
-## Overview
+---
 
-PhishRadar is a full-stack security MVP focused on explainable phishing detection. It analyzes text, URLs, and raw email-style content using a deterministic heuristic engine and returns a risk `score`, a final `label`, and the `reasons` behind the decision.
+## O Problema
 
-The project includes three user-facing surfaces:
+Phishing continua explorando sinais simples, mas eficazes: urgência, links manipulados, domínios enganosos e pedidos indevidos de credenciais.
 
-- a FastAPI backend with the risk engine and public analysis endpoints
-- a Next.js web app for manual analysis
-- a Manifest V3 Chrome extension with manual analysis, automatic page analysis, badge updates, and URL-based caching
+| Problema | Impacto |
+|---|---|
+| URLs suspeitas podem parecer legítimas à primeira vista | Aumenta a chance de clique indevido |
+| Mensagens com urgência induzem ação impulsiva | Reduz a avaliação crítica do usuário |
+| Domínios lookalike confundem marcas confiáveis com imitações | Facilita roubo de credenciais |
+| Usuários nem sempre têm contexto técnico para avaliar risco | A decisão fica lenta ou imprecisa |
 
-## Production
+---
 
-- Web app: https://phishradar.vercel.app
-- Backend API: https://phishradar-production.up.railway.app
+## A Solução
 
-## Core Features
+O **PhishRadar** entrega uma análise explicável e determinística de conteúdo suspeito via API, web app e extensão Chrome.
 
-- Deterministic phishing risk engine with explicit scoring and reasons
-- URL heuristics for suspicious keywords, risky TLD context, brand lookalikes, and suspicious URL structure
-- Text heuristics for urgency, credential/payment requests, URL shorteners, and suspicious domain patterns
-- Web interface for analyzing free-form text, URLs, and raw email content
-- Chrome extension popup for manual analysis of the current tab or pasted content
-- Automatic extension analysis for the active page with dynamic risk badge
-- Local URL cache in the extension to avoid repeated API calls for the same page
+O sistema recebe texto, URL ou conteúdo bruto de e-mail e retorna:
 
-## Example Response
+- `score`: pontuação de risco de `0` a `100`
+- `label`: classificação final (`LOW_RISK`, `SUSPICIOUS`, `HIGH_RISK`)
+- `reasons`: sinais identificados que explicam a decisão
+
+Além da análise manual, a extensão também executa análise automática da página ativa, atualiza badge dinamicamente e reutiliza cache por URL.
+
+---
+
+## Pipeline
+
+```text
+Texto/URL -> FastAPI /analyze -> Risk Engine Heurístico -> Score -> Label -> Reasons -> Web App / Chrome Extension
+```
+
+---
+
+## Funcionalidades
+
+### Backend e Risk Engine
+
+- API FastAPI com rotas de health check e análise
+- motor heurístico determinístico e explicável
+- scoring por categorias com thresholds previsíveis
+- resposta padronizada para todos os clientes
+
+---
+
+### Heurísticas de Risco
+
+Detecta sinais como:
+
+- linguagem de urgência
+- encurtadores de URL
+- padrões suspeitos de domínio
+- pedidos de credenciais ou pagamento
+- keywords suspeitas na URL
+- TLDs de maior risco em contexto sensível
+- brand lookalikes simples com substituições visuais
+- estrutura suspeita de path e query params
+
+Cada regra adiciona score de forma controlada e com motivo explícito no resultado.
+
+---
+
+### Web App
+
+- interface em Next.js + TypeScript para análise manual
+- integração com backend via rota server-side
+- exibição clara de score, label e reasons
+- tratamento simples de loading e erro
+
+---
+
+### Extensão Chrome
+
+- análise manual da aba atual
+- análise manual de texto ou URL colado
+- análise automática ao trocar de página
+- badge dinâmica baseada no risco retornado pela API
+- cache por URL em `chrome.storage.local`
+
+---
+
+### Risk Scoring
+
+| Score | Classificação |
+|---|---|
+| 0-34 | LOW_RISK |
+| 35-69 | SUSPICIOUS |
+| 70+ | HIGH_RISK |
+
+---
+
+## Caso de Uso
+
+### Entrada
+
+```text
+Urgent: confirm your password at https://login-secure-account-update.example.com now.
+```
+
+### Saída
 
 ```json
 {
@@ -48,143 +134,93 @@ The project includes three user-facing surfaces:
 }
 ```
 
+---
+
 ## Stack
 
-| Layer | Technology |
+| Camada | Tecnologia |
 |---|---|
-| Backend API | FastAPI, Pydantic, Uvicorn |
-| Risk Engine | Python, deterministic heuristics |
+| Backend | FastAPI, Pydantic, Uvicorn |
+| Risk Engine | Python, heurísticas determinísticas |
+| Testes | pytest |
 | Frontend | Next.js, React, TypeScript |
-| Browser Extension | Chrome Extension, Manifest V3, vanilla JavaScript |
-| Testing | pytest, TypeScript typecheck |
-| Deploy | Railway for backend, Vercel for frontend |
+| Extensão | Chrome Extension, Manifest V3, JavaScript |
+| Deploy | Railway e Vercel |
 
-## Architecture
+---
 
-```text
-User Input
-  |-- Web app (Next.js)
-  |-- Chrome extension popup
-  |-- Chrome extension automatic tab analysis
-          |
-          v
-      FastAPI /analyze
-          |
-          v
-     Heuristic risk engine
-          |
-          v
-  score + label + reasons
-```
+## Produção
 
-### Repository Structure
+- Web app: https://phishradar.vercel.app
+- Backend API: https://phishradar-production.up.railway.app
 
-```text
-phishradar/
-|-- app/
-|   |-- analyzers/
-|   |   `-- risk_engine.py
-|   |-- api/routes/
-|   |   |-- analyze.py
-|   |   `-- health.py
-|   |-- schemas/
-|   `-- main.py
-|-- extension/
-|   |-- manifest.json
-|   |-- background.js
-|   |-- popup.html
-|   |-- popup.css
-|   `-- popup.js
-|-- frontend/
-|   |-- app/
-|   |   |-- api/analyze/route.ts
-|   |   `-- page.tsx
-|   |-- lib/phishradar-api.ts
-|   `-- types/analysis.ts
-|-- tests/
-|   `-- test_risk_engine.py
-|-- docs/
-|-- Procfile
-`-- requirements.txt
-```
+---
 
-## Running Locally
+## Como Rodar Localmente
 
-### 1. Backend
-
-From the repository root:
+### Backend
 
 ```bash
 pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
-Backend local URL:
+Backend local:
 
 ```text
 http://localhost:8000
 ```
 
-Useful endpoints:
+Rotas principais:
 
 - `GET /health`
 - `POST /analyze`
 
-### 2. Frontend
+---
 
-From [`frontend/`](/c:/Users/jluiz/Documents/GitHub/phishradar/frontend):
+### Frontend
 
 ```bash
+cd frontend
 npm install
 npm run dev
 ```
 
-Set `frontend/.env.local` with:
+Configure `frontend/.env.local`:
 
 ```text
 PHISHRADAR_API_BASE_URL=http://localhost:8000
 ```
 
-Frontend local URL:
+Frontend local:
 
 ```text
 http://localhost:3000
 ```
 
-### 3. Chrome Extension
+---
 
-The extension lives in [`extension/`](/c:/Users/jluiz/Documents/GitHub/phishradar/extension).
+### Extensão Chrome
 
-To load it locally:
+A extensão fica em [`extension/`](/c:/Users/jluiz/Documents/GitHub/phishradar/extension).
 
-1. Open `chrome://extensions`
-2. Enable `Developer mode`
-3. Click `Load unpacked`
-4. Select the `extension/` folder
+Para carregar localmente:
 
-Current extension behavior:
+1. Acesse `chrome://extensions`
+2. Ative `Developer mode`
+3. Clique em `Load unpacked`
+4. Selecione a pasta `extension/`
 
-- manual analysis of pasted text or URLs
-- manual analysis of the current tab
-- automatic analysis when the active page changes
-- dynamic badge color and label based on backend risk output
-- per-URL cache using `chrome.storage.local`
+Comportamento atual:
 
-## Consistency Across Interfaces
+- popup com análise manual
+- leitura automática do resultado da URL ativa
+- badge dinâmica por nível de risco
+- cache local por URL
 
-The backend is the single source of truth for scoring. Both the web app and the extension consume the same analysis contract:
+---
 
-```json
-{
-  "score": 0,
-  "label": "LOW_RISK | SUSPICIOUS | HIGH_RISK",
-  "reasons": []
-}
-```
-
-This keeps the result format consistent across API responses, the Next.js UI, and the Chrome extension popup.
-
-## Testing
+## Testes
 
 ### Backend
 
@@ -194,63 +230,119 @@ pytest
 
 ### Frontend
 
-From `frontend/`:
-
 ```bash
+cd frontend
 npm run typecheck
 npm run build
 ```
 
-### Extension
+### Extensão
 
-There is no dedicated automated test suite for the extension yet. Current validation is done through local loading in Chrome and syntax checks for the extension scripts.
+Validação atual:
 
-## Extension Notes
+- carregamento local no Chrome
+- checagem de sintaxe dos scripts
 
-The extension is built with Manifest V3 and keeps the implementation intentionally simple:
+---
 
-- `background.js` handles automatic tab analysis and badge updates
-- `popup.js` handles manual analysis and automatic result display for the active tab
-- `chrome.storage.local` caches analysis results by URL
-- unsupported URLs such as internal browser pages are ignored safely
+## Arquitetura
+
+```text
+phishradar/
+|-- app/
+|   |-- analyzers/
+|   |   `-- risk_engine.py
+|   |-- api/
+|   |   `-- routes/
+|   |       |-- analyze.py
+|   |       `-- health.py
+|   |-- schemas/
+|   |   `-- analyze.py
+|   `-- main.py
+|-- extension/
+|   |-- background.js
+|   |-- manifest.json
+|   |-- popup.html
+|   |-- popup.css
+|   `-- popup.js
+|-- frontend/
+|   |-- app/
+|   |   |-- api/analyze/route.ts
+|   |   `-- page.tsx
+|   |-- lib/
+|   |   `-- phishradar-api.ts
+|   `-- types/
+|       `-- analysis.ts
+|-- tests/
+|   `-- test_risk_engine.py
+|-- docs/
+|-- Procfile
+`-- requirements.txt
+```
+
+---
 
 ## Screenshots
 
-Placeholders for repository visuals:
+Espaço reservado para imagens do projeto:
 
-- web app home screen with analysis form
-- web app result state showing `HIGH_RISK`
-- extension popup showing cached page analysis
-- extension badge in `LOW_RISK`, `SUSPICIOUS`, and `HIGH_RISK` states
+- web app com formulário de análise
+- resultado `LOW_RISK`
+- resultado `HIGH_RISK`
+- popup da extensão com análise automática
+- badge da extensão nos estados `LOW_RISK`, `SUSPICIOUS` e `HIGH_RISK`
+
+---
+
+## Limitações
+
+- não usa machine learning
+- não consulta reputação externa
+- não faz análise de histórico de navegação
+- não substitui análise humana em contexto real de incidentes
+
+---
 
 ## Roadmap
 
-- add more phishing heuristics for email header and sender analysis
-- add repository screenshots and extension GIF demo
-- add integration or end-to-end coverage for key user flows
-- refine UI polish for the web app and extension popup
+| Versão | Foco | Status |
+|---|---|---|
+| M1-M4 | Backend, engine inicial e API | Concluído |
+| M5-M6 | Web app em Next.js | Concluído |
+| M7-M9 | Extensão Chrome, automação, badge e cache | Concluído |
+| Próximo | Screenshots, testes de integração e novos sinais de e-mail | Planejado |
 
-## Limitations
+---
 
-- no machine learning or third-party reputation feeds
-- no browser history analysis or background crawling
-- no authentication or user accounts
-- heuristic output is useful for triage, not a substitute for full incident response
+## Objetivo
 
-## Portfolio Value
+Demonstrar:
 
-This project demonstrates:
+- desenvolvimento full stack com FastAPI e Next.js
+- construção de um risk engine explicável e determinístico
+- integração entre backend, frontend e extensão Chrome
+- uso de Manifest V3 em um fluxo de análise automática
+- deploy desacoplado entre Railway e Vercel
 
-- backend API design with FastAPI
-- deterministic security-oriented rule design
-- frontend integration with Next.js and TypeScript
-- browser extension development with Manifest V3
-- production deployment split across Railway and Vercel
-- clean separation between analysis engine, API layer, and clients
+---
 
-## Author
+## Resumo do Projeto
+
+O PhishRadar mostra como um produto de segurança enxuto pode combinar regras heurísticas, API bem definida e múltiplas interfaces sem depender de serviços externos ou modelos complexos.
+
+O resultado é um MVP funcional, testável e claro para portfólio técnico.
+
+---
+
+## Desenvolvedor
 
 Jefferson Ferreira
 
 - GitHub: [jeffersonferreira-ti](https://github.com/jeffersonferreira-ti)
 - LinkedIn: [Jefferson Ferreira](https://www.linkedin.com/in/jefferson-ferreira-ti)
+
+---
+
+<div align="center">
+  <sub>PhishRadar · 2026</sub>
+</div>
