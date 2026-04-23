@@ -9,3 +9,4 @@ class AnalyzeResponse(BaseModel):
     score: int
     label: str
     reasons: list[str]
+    breakdown: dict[str, int]

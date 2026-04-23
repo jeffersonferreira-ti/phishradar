@@ -13,6 +13,7 @@ class RiskAnalysis:
     score: int
     label: RiskLabel
     reasons: list[str]
+    breakdown: dict[str, int]
 
 
 @dataclass(frozen=True)
@@ -179,10 +180,11 @@ def analyze_content(content: str) -> RiskAnalysis:
     normalized_content = _normalize_text(content.strip())
 
     if not normalized_content:
-        return _build_analysis(score=0, reasons=[])
+        return _build_analysis(score=0, reasons=[], breakdown=_empty_breakdown())
 
     total_score = 0
     reasons: list[str] = []
+    breakdown = _empty_breakdown()
 
     domains = _extract_unique_domains(content)
     parsed_urls = _extract_urls(content)
@@ -199,18 +201,26 @@ def analyze_content(content: str) -> RiskAnalysis:
             continue
 
         total_score += evaluation.score
+        _add_to_breakdown(breakdown, evaluation.category, evaluation.score)
         if evaluation.reason is not None:
             reasons.append(evaluation.reason)
 
-    return _build_analysis(score=total_score, reasons=reasons)
+    return _build_analysis(score=total_score, reasons=reasons, breakdown=breakdown)
 
 
-def _build_analysis(score: int, reasons: list[str]) -> RiskAnalysis:
+def _build_analysis(
+    score: int,
+    reasons: list[str],
+    breakdown: dict[str, int],
+) -> RiskAnalysis:
     capped_score = min(score, MAX_SCORE)
     return RiskAnalysis(
         score=capped_score,
         label=_label_for_score(capped_score),
         reasons=_deduplicate_reasons(reasons),
+        # Breakdown stores raw category sums before the overall MAX_SCORE cap so
+        # calibration work can see which rule families drove the raw total.
+        breakdown=breakdown.copy(),
     )
 
 
@@ -226,6 +236,26 @@ def _deduplicate_reasons(reasons: list[str]) -> list[str]:
         seen_reasons.add(reason)
 
     return unique_reasons
+
+
+def _empty_breakdown() -> dict[str, int]:
+    return {
+        "content_score": 0,
+        "url_score": 0,
+        "domain_score": 0,
+        "brand_score": 0,
+        "correlation_score": 0,
+    }
+
+
+def _add_to_breakdown(
+    breakdown: dict[str, int],
+    category: str,
+    score: int,
+) -> None:
+    # Each rule contributes to one top-level scoring bucket so the response can
+    # explain how the raw score was assembled without exposing evaluator internals.
+    breakdown[category] += score
 
 
 def _contains_pattern(content: str, patterns: tuple[str, ...]) -> bool:
@@ -334,7 +364,7 @@ def _evaluate_urgency_rule(normalized_content: str) -> RuleEvaluation:
         matched=_contains_pattern(normalized_content, URGENCY_PATTERNS),
         score=URGENCY_SCORE,
         reason=URGENCY_REASON,
-        category="urgency",
+        category="content_score",
     )
 
 
@@ -343,7 +373,7 @@ def _evaluate_url_shortener_rule(domains: list[str]) -> RuleEvaluation:
         matched=_has_url_shortener(domains),
         score=URL_SHORTENER_SCORE,
         reason=URL_SHORTENER_REASON,
-        category="url_shortener",
+        category="url_score",
     )
 
 
@@ -352,7 +382,7 @@ def _evaluate_suspicious_domain_rule(domains: list[str]) -> RuleEvaluation:
         matched=_has_suspicious_domain_pattern(domains),
         score=SUSPICIOUS_DOMAIN_SCORE,
         reason=SUSPICIOUS_DOMAIN_REASON,
-        category="suspicious_domain",
+        category="domain_score",
     )
 
 
@@ -361,7 +391,7 @@ def _evaluate_credential_payment_rule(normalized_content: str) -> RuleEvaluation
         matched=_contains_pattern(normalized_content, CREDENTIAL_PAYMENT_PATTERNS),
         score=CREDENTIAL_PAYMENT_SCORE,
         reason=CREDENTIAL_PAYMENT_REASON,
-        category="credential_payment",
+        category="content_score",
     )
 
 
@@ -370,7 +400,7 @@ def _evaluate_brazilian_scam_pattern_rule(normalized_content: str) -> RuleEvalua
         matched=_contains_pattern(normalized_content, BRAZILIAN_SCAM_PATTERNS),
         score=BRAZILIAN_SCAM_PATTERN_SCORE,
         reason=BRAZILIAN_SCAM_PATTERN_REASON,
-        category="brazilian_scam_pattern",
+        category="content_score",
     )
 
 
@@ -379,7 +409,7 @@ def _evaluate_suspicious_url_keyword_rule(urls: list[str]) -> RuleEvaluation:
         matched=_has_suspicious_url_keywords(urls),
         score=SUSPICIOUS_URL_KEYWORD_SCORE,
         reason=SUSPICIOUS_URL_KEYWORD_REASON,
-        category="suspicious_url_keyword",
+        category="url_score",
     )
 
 
@@ -388,7 +418,7 @@ def _evaluate_high_risk_tld_rule(urls: list[str]) -> RuleEvaluation:
         matched=_has_high_risk_tld_in_sensitive_context(urls),
         score=HIGH_RISK_TLD_SCORE,
         reason=HIGH_RISK_TLD_REASON,
-        category="high_risk_tld",
+        category="url_score",
     )
 
 
@@ -397,7 +427,7 @@ def _evaluate_brand_lookalike_rule(urls: list[str]) -> RuleEvaluation:
         matched=_has_brand_lookalike(urls),
         score=BRAND_LOOKALIKE_SCORE,
         reason=BRAND_LOOKALIKE_REASON,
-        category="brand_lookalike",
+        category="brand_score",
     )
 
 
@@ -413,7 +443,7 @@ def _evaluate_brand_mismatch_rule(
         reason=_brand_mismatch_reason(mismatched_brand)
         if mismatched_brand is not None
         else None,
-        category="brand_mismatch",
+        category="brand_score",
     )
 
 
@@ -422,7 +452,7 @@ def _evaluate_suspicious_url_structure_rule(urls: list[str]) -> RuleEvaluation:
         matched=_has_suspicious_url_structure(urls),
         score=SUSPICIOUS_URL_STRUCTURE_SCORE,
         reason=SUSPICIOUS_URL_STRUCTURE_REASON,
-        category="suspicious_url_structure",
+        category="url_score",
     )
 
 
@@ -436,7 +466,7 @@ def _evaluate_urgency_sensitive_action_correlation_rule(
         and _has_sensitive_action(normalized_content=normalized_content, urls=urls),
         score=URGENCY_SENSITIVE_ACTION_CORRELATION_SCORE,
         reason=URGENCY_SENSITIVE_ACTION_CORRELATION_REASON,
-        category="urgency_sensitive_action_correlation",
+        category="correlation_score",
     )
 
 
@@ -451,7 +481,7 @@ def _evaluate_shortener_sensitive_action_correlation_rule(
         and _has_sensitive_action(normalized_content=normalized_content, urls=urls),
         score=SHORTENER_SENSITIVE_ACTION_CORRELATION_SCORE,
         reason=SHORTENER_SENSITIVE_ACTION_CORRELATION_REASON,
-        category="shortener_sensitive_action_correlation",
+        category="correlation_score",
     )
 
 
@@ -466,7 +496,7 @@ def _evaluate_suspicious_domain_sensitive_action_correlation_rule(
         and _has_sensitive_action(normalized_content=normalized_content, urls=urls),
         score=SUSPICIOUS_DOMAIN_SENSITIVE_ACTION_CORRELATION_SCORE,
         reason=SUSPICIOUS_DOMAIN_SENSITIVE_ACTION_CORRELATION_REASON,
-        category="suspicious_domain_sensitive_action_correlation",
+        category="correlation_score",
     )
 
 

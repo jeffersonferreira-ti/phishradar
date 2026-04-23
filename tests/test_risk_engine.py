@@ -7,6 +7,13 @@ def test_neutral_text_returns_low_risk_without_reasons() -> None:
     assert analysis.score == 0
     assert analysis.label == "LOW_RISK"
     assert analysis.reasons == []
+    assert analysis.breakdown == {
+        "content_score": 0,
+        "url_score": 0,
+        "domain_score": 0,
+        "brand_score": 0,
+        "correlation_score": 0,
+    }
 
 
 def test_empty_text_returns_low_risk_without_reasons() -> None:
@@ -91,6 +98,13 @@ def test_multiple_combined_signals_return_high_risk() -> None:
         "Urgent language is combined with a sensitive action request.",
         "Suspicious domain traits are combined with a sensitive action signal.",
     ]
+    assert analysis.breakdown == {
+        "content_score": 30,
+        "url_score": 8,
+        "domain_score": 18,
+        "brand_score": 0,
+        "correlation_score": 35,
+    }
 
 
 def test_suspicious_url_keywords_raise_url_only_analysis() -> None:
@@ -183,6 +197,31 @@ def test_brand_mismatch_and_brand_lookalike_can_both_trigger() -> None:
         "Message mentions Paypal but linked URLs do not use its official domains.",
         "URL structure includes suspicious phishing-related patterns.",
     ]
+    assert analysis.breakdown == {
+        "content_score": 0,
+        "url_score": 20,
+        "domain_score": 0,
+        "brand_score": 55,
+        "correlation_score": 0,
+    }
+
+
+def test_breakdown_keeps_raw_category_sums_when_total_is_capped() -> None:
+    analysis = analyze_content(
+        "Urgent PayPal: entrega retida, confirme sua senha e atualizacao cadastral em "
+        "https://bit.ly/login e https://paypa1-secure-login.example.top/"
+        "home?session=abc&redirect=verify"
+    )
+
+    assert analysis.score == 100
+    assert sum(analysis.breakdown.values()) > analysis.score
+    assert analysis.breakdown == {
+        "content_score": 35,
+        "url_score": 40,
+        "domain_score": 18,
+        "brand_score": 55,
+        "correlation_score": 55,
+    }
 
 
 def test_suspicious_query_parameters_raise_structure_signal() -> None:

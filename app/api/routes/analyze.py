@@ -14,4 +14,5 @@ def analyze(request: AnalyzeRequest) -> AnalyzeResponse:
         score=analysis.score,
         label=analysis.label,
         reasons=analysis.reasons,
+        breakdown=analysis.breakdown,
     )
