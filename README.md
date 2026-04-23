@@ -18,6 +18,7 @@ Analyze. Explain. Prevent.
 
 **Plataforma de deteccao de phishing com scoring explicavel e correlacao de sinais em tempo real**
 
+</div>
 ---
 
 ## Visao Geral do Projeto
