@@ -32,6 +32,9 @@ SUSPICIOUS_URL_KEYWORD_SCORE = 8
 HIGH_RISK_TLD_SCORE = 10
 BRAND_LOOKALIKE_SCORE = 25
 SUSPICIOUS_URL_STRUCTURE_SCORE = 12
+URGENCY_SENSITIVE_ACTION_CORRELATION_SCORE = 20
+SHORTENER_SENSITIVE_ACTION_CORRELATION_SCORE = 20
+SUSPICIOUS_DOMAIN_SENSITIVE_ACTION_CORRELATION_SCORE = 15
 
 MODERATE_THRESHOLD = 20
 SUSPICIOUS_THRESHOLD = 45
@@ -48,6 +51,15 @@ HIGH_RISK_TLD_REASON = "URL uses a higher-risk top-level domain for sensitive co
 BRAND_LOOKALIKE_REASON = "URL appears to mimic a known brand name."
 SUSPICIOUS_URL_STRUCTURE_REASON = (
     "URL structure includes suspicious phishing-related patterns."
+)
+URGENCY_SENSITIVE_ACTION_CORRELATION_REASON = (
+    "Urgent language is combined with a sensitive action request."
+)
+SHORTENER_SENSITIVE_ACTION_CORRELATION_REASON = (
+    "A URL shortener is combined with a sensitive action signal."
+)
+SUSPICIOUS_DOMAIN_SENSITIVE_ACTION_CORRELATION_REASON = (
+    "Suspicious domain traits are combined with a sensitive action signal."
 )
 
 SHORTENER_DOMAINS: set[str] = {
@@ -164,8 +176,22 @@ def _build_analysis(score: int, reasons: list[str]) -> RiskAnalysis:
     return RiskAnalysis(
         score=capped_score,
         label=_label_for_score(capped_score),
-        reasons=reasons.copy(),
+        reasons=_deduplicate_reasons(reasons),
     )
+
+
+def _deduplicate_reasons(reasons: list[str]) -> list[str]:
+    unique_reasons: list[str] = []
+    seen_reasons: set[str] = set()
+
+    for reason in reasons:
+        if reason in seen_reasons:
+            continue
+
+        unique_reasons.append(reason)
+        seen_reasons.add(reason)
+
+    return unique_reasons
 
 
 def _contains_pattern(content: str, patterns: tuple[str, ...]) -> bool:
@@ -235,6 +261,20 @@ def _evaluate_rules(
         _evaluate_high_risk_tld_rule(urls),
         _evaluate_brand_lookalike_rule(urls),
         _evaluate_suspicious_url_structure_rule(urls),
+        _evaluate_urgency_sensitive_action_correlation_rule(
+            normalized_content=normalized_content,
+            urls=urls,
+        ),
+        _evaluate_shortener_sensitive_action_correlation_rule(
+            normalized_content=normalized_content,
+            domains=domains,
+            urls=urls,
+        ),
+        _evaluate_suspicious_domain_sensitive_action_correlation_rule(
+            normalized_content=normalized_content,
+            domains=domains,
+            urls=urls,
+        ),
     )
 
 
@@ -325,6 +365,50 @@ def _evaluate_suspicious_url_structure_rule(urls: list[str]) -> RuleEvaluation:
     )
 
 
+def _evaluate_urgency_sensitive_action_correlation_rule(
+    *,
+    normalized_content: str,
+    urls: list[str],
+) -> RuleEvaluation:
+    return _evaluation(
+        matched=_contains_pattern(normalized_content, URGENCY_PATTERNS)
+        and _has_sensitive_action(normalized_content=normalized_content, urls=urls),
+        score=URGENCY_SENSITIVE_ACTION_CORRELATION_SCORE,
+        reason=URGENCY_SENSITIVE_ACTION_CORRELATION_REASON,
+        category="urgency_sensitive_action_correlation",
+    )
+
+
+def _evaluate_shortener_sensitive_action_correlation_rule(
+    *,
+    normalized_content: str,
+    domains: list[str],
+    urls: list[str],
+) -> RuleEvaluation:
+    return _evaluation(
+        matched=_has_url_shortener(domains)
+        and _has_sensitive_action(normalized_content=normalized_content, urls=urls),
+        score=SHORTENER_SENSITIVE_ACTION_CORRELATION_SCORE,
+        reason=SHORTENER_SENSITIVE_ACTION_CORRELATION_REASON,
+        category="shortener_sensitive_action_correlation",
+    )
+
+
+def _evaluate_suspicious_domain_sensitive_action_correlation_rule(
+    *,
+    normalized_content: str,
+    domains: list[str],
+    urls: list[str],
+) -> RuleEvaluation:
+    return _evaluation(
+        matched=_has_suspicious_domain_pattern(domains)
+        and _has_sensitive_action(normalized_content=normalized_content, urls=urls),
+        score=SUSPICIOUS_DOMAIN_SENSITIVE_ACTION_CORRELATION_SCORE,
+        reason=SUSPICIOUS_DOMAIN_SENSITIVE_ACTION_CORRELATION_REASON,
+        category="suspicious_domain_sensitive_action_correlation",
+    )
+
+
 def _has_url_shortener(domains: list[str]) -> bool:
     return any(
         _is_url_shortener_domain(domain, shortener)
@@ -395,6 +479,14 @@ def _has_brand_lookalike(urls: list[str]) -> bool:
 
 def _has_suspicious_url_structure(urls: list[str]) -> bool:
     return any(_url_has_suspicious_structure(url) for url in urls)
+
+
+def _has_sensitive_action(*, normalized_content: str, urls: list[str]) -> bool:
+    return (
+        _contains_pattern(normalized_content, CREDENTIAL_PAYMENT_PATTERNS)
+        or _has_suspicious_url_keywords(urls)
+        or _has_suspicious_url_structure(urls)
+    )
 
 
 def _url_has_sensitive_keyword(url: str) -> bool:

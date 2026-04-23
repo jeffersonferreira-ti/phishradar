@@ -59,13 +59,15 @@ def test_multiple_combined_signals_return_high_risk() -> None:
         "https://login-secure-account-update.example.com now."
     )
 
-    assert analysis.score == 56
-    assert analysis.label == "SUSPICIOUS"
+    assert analysis.score == 91
+    assert analysis.label == "HIGH_RISK"
     assert analysis.reasons == [
         "Message uses urgent language to pressure the recipient.",
         "Message contains a suspicious domain pattern.",
         "Message requests credentials or payment action.",
         "URL contains suspicious phishing-related keywords.",
+        "Urgent language is combined with a sensitive action request.",
+        "Suspicious domain traits are combined with a sensitive action signal.",
     ]
 
 
@@ -135,3 +137,40 @@ def test_score_at_suspicious_threshold_returns_suspicious() -> None:
 
 def test_score_at_high_risk_threshold_returns_high_risk() -> None:
     assert _label_for_score(70) == "HIGH_RISK"
+
+
+def test_urgency_and_sensitive_action_correlation_adds_score() -> None:
+    analysis = analyze_content("Urgent: confirm your password immediately.")
+
+    assert analysis.score == 50
+    assert analysis.label == "SUSPICIOUS"
+    assert analysis.reasons == [
+        "Message uses urgent language to pressure the recipient.",
+        "Message requests credentials or payment action.",
+        "Urgent language is combined with a sensitive action request.",
+    ]
+
+
+def test_shortener_and_sensitive_action_correlation_adds_score() -> None:
+    analysis = analyze_content("Review here: https://bit.ly/login")
+
+    assert analysis.score == 50
+    assert analysis.label == "SUSPICIOUS"
+    assert analysis.reasons == [
+        "Message contains a URL shortening service.",
+        "URL contains suspicious phishing-related keywords.",
+        "URL structure includes suspicious phishing-related patterns.",
+        "A URL shortener is combined with a sensitive action signal.",
+    ]
+
+
+def test_suspicious_domain_and_sensitive_action_correlation_adds_score() -> None:
+    analysis = analyze_content("Visit https://login-secure-account-update.example.com")
+
+    assert analysis.score == 41
+    assert analysis.label == "MODERATE"
+    assert analysis.reasons == [
+        "Message contains a suspicious domain pattern.",
+        "URL contains suspicious phishing-related keywords.",
+        "Suspicious domain traits are combined with a sensitive action signal.",
+    ]
