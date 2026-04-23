@@ -53,6 +53,28 @@ def test_credential_or_payment_request_increases_score_and_label() -> None:
     assert analysis.reasons == ["Message requests credentials or payment action."]
 
 
+def test_brazilian_scam_pattern_increases_score() -> None:
+    analysis = analyze_content("Seu pacote está com entrega retida e taxa pendente.")
+
+    assert analysis.score == 25
+    assert analysis.label == "MODERATE"
+    assert analysis.reasons == [
+        "Content matches common Brazilian delivery, fee, or payment scam patterns."
+    ]
+
+
+def test_brazilian_scam_pattern_supports_normalized_text_matching() -> None:
+    analysis = analyze_content(
+        "Alfândega informa atualização cadastral para pix para liberação."
+    )
+
+    assert analysis.score == 25
+    assert analysis.label == "MODERATE"
+    assert analysis.reasons == [
+        "Content matches common Brazilian delivery, fee, or payment scam patterns."
+    ]
+
+
 def test_multiple_combined_signals_return_high_risk() -> None:
     analysis = analyze_content(
         "Urgent: confirm your password at "

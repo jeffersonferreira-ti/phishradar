@@ -36,6 +36,7 @@ URGENCY_SENSITIVE_ACTION_CORRELATION_SCORE = 20
 SHORTENER_SENSITIVE_ACTION_CORRELATION_SCORE = 20
 SUSPICIOUS_DOMAIN_SENSITIVE_ACTION_CORRELATION_SCORE = 15
 BRAND_MISMATCH_SCORE = 30
+BRAZILIAN_SCAM_PATTERN_SCORE = 25
 
 MODERATE_THRESHOLD = 20
 SUSPICIOUS_THRESHOLD = 45
@@ -62,6 +63,9 @@ SHORTENER_SENSITIVE_ACTION_CORRELATION_REASON = (
 SUSPICIOUS_DOMAIN_SENSITIVE_ACTION_CORRELATION_REASON = (
     "Suspicious domain traits are combined with a sensitive action signal."
 )
+BRAZILIAN_SCAM_PATTERN_REASON = (
+    "Content matches common Brazilian delivery, fee, or payment scam patterns."
+)
 
 SHORTENER_DOMAINS: set[str] = {
     "bit.ly",
@@ -83,6 +87,20 @@ CREDENTIAL_PAYMENT_PATTERNS: tuple[str, ...] = (
     "update your payment",
     "informe sua senha",
     "regularize seu pagamento",
+)
+
+BRAZILIAN_SCAM_PATTERNS: tuple[str, ...] = (
+    "entrega retida",
+    "taxa pendente",
+    "reentrega",
+    "alfandega",
+    "correios",
+    "pacote bloqueado",
+    "regularizacao de pagamento",
+    "pix para liberacao",
+    "atualizacao cadastral",
+    "conta bloqueada",
+    "confirmacao de dispositivo",
 )
 
 SUSPICIOUS_URL_KEYWORDS: tuple[str, ...] = (
@@ -273,6 +291,7 @@ def _evaluate_rules(
         _evaluate_url_shortener_rule(domains),
         _evaluate_suspicious_domain_rule(domains),
         _evaluate_credential_payment_rule(normalized_content),
+        _evaluate_brazilian_scam_pattern_rule(normalized_content),
         _evaluate_suspicious_url_keyword_rule(urls),
         _evaluate_high_risk_tld_rule(urls),
         _evaluate_brand_lookalike_rule(urls),
@@ -343,6 +362,15 @@ def _evaluate_credential_payment_rule(normalized_content: str) -> RuleEvaluation
         score=CREDENTIAL_PAYMENT_SCORE,
         reason=CREDENTIAL_PAYMENT_REASON,
         category="credential_payment",
+    )
+
+
+def _evaluate_brazilian_scam_pattern_rule(normalized_content: str) -> RuleEvaluation:
+    return _evaluation(
+        matched=_contains_pattern(normalized_content, BRAZILIAN_SCAM_PATTERNS),
+        score=BRAZILIAN_SCAM_PATTERN_SCORE,
+        reason=BRAZILIAN_SCAM_PATTERN_REASON,
+        category="brazilian_scam_pattern",
     )
 
 
