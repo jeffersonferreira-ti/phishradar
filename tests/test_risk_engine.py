@@ -287,3 +287,84 @@ def test_suspicious_domain_and_sensitive_action_correlation_adds_score() -> None
         "URL contains suspicious phishing-related keywords.",
         "Suspicious domain traits are combined with a sensitive action signal.",
     ]
+
+
+def test_benign_content_stays_below_any_risk_threshold() -> None:
+    analysis = analyze_content(
+        "Hi team, the project update is attached for tomorrow's planning meeting."
+    )
+
+    assert analysis.score == 0
+    assert analysis.label == "LOW_RISK"
+
+
+def test_urgency_only_content_scores_above_benign_but_remains_low_risk() -> None:
+    benign_analysis = analyze_content("Hello team, see you in tomorrow's meeting.")
+    urgency_analysis = analyze_content("Urgent: please review this notice today.")
+
+    assert urgency_analysis.score > benign_analysis.score
+    assert urgency_analysis.label == "LOW_RISK"
+
+
+def test_credential_request_content_reaches_moderate_risk_band() -> None:
+    analysis = analyze_content("Please confirm your password to continue.")
+
+    assert analysis.score >= 20
+    assert analysis.label == "MODERATE"
+
+
+def test_shortened_url_with_sensitive_action_scores_higher_than_shortener_only() -> None:
+    shortener_only_analysis = analyze_content(
+        "Review the document at https://bit.ly/example."
+    )
+    combined_analysis = analyze_content("Review here: https://bit.ly/login")
+
+    assert combined_analysis.score > shortener_only_analysis.score
+    assert combined_analysis.label == "SUSPICIOUS"
+
+
+def test_brand_lookalike_url_is_flagged_as_at_least_moderate() -> None:
+    analysis = analyze_content("https://paypa1.com")
+
+    assert analysis.score >= 25
+    assert analysis.label == "MODERATE"
+
+
+def test_brand_mismatch_between_content_and_linked_domain_is_flagged() -> None:
+    analysis = analyze_content(
+        "Your PayPal account needs review: https://secure-check.example.com"
+    )
+
+    assert analysis.score >= 30
+    assert analysis.label == "MODERATE"
+    assert any("official domains" in reason for reason in analysis.reasons)
+
+
+def test_brazilian_delivery_fee_scam_content_is_flagged() -> None:
+    analysis = analyze_content(
+        "Seu pacote está bloqueado nos Correios por taxa pendente para liberação."
+    )
+
+    assert analysis.score >= 25
+    assert analysis.label == "MODERATE"
+    assert analysis.reasons == [
+        "Content matches common Brazilian delivery, fee, or payment scam patterns."
+    ]
+
+
+def test_mid_risk_content_is_classified_as_moderate() -> None:
+    analysis = analyze_content("https://example.com/login/verify/account")
+
+    assert 20 <= analysis.score < 45
+    assert analysis.label == "MODERATE"
+
+
+def test_regression_shortener_plus_sensitive_action_avoids_previous_false_negative() -> None:
+    analysis = analyze_content(
+        "Urgente: acompanhe a reentrega e confirme aqui https://bit.ly/login"
+    )
+
+    assert analysis.score >= 45
+    assert analysis.label in {"SUSPICIOUS", "HIGH_RISK"}
+    assert any("URL shortener" in reason for reason in analysis.reasons)
+    assert any("sensitive action signal" in reason for reason in analysis.reasons)
