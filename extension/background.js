@@ -102,9 +102,8 @@ async function processTab(tabId, url) {
   try {
     const result = await analyzeUrlWithCache(url);
     await updateBadgeForTab(tabId, result);
-  } catch (error) {
+  } catch {
     await clearBadge(tabId);
-    console.error("PhishRadar automatic analysis failed.", error);
   }
 }
 
@@ -120,8 +119,7 @@ chrome.tabs.onActivated.addListener(async ({ tabId }) => {
   try {
     const tab = await chrome.tabs.get(tabId);
     await processTab(tabId, tab.url);
-  } catch (error) {
+  } catch {
     await clearBadge(tabId);
-    console.error("PhishRadar could not refresh the active tab badge.", error);
   }
 });

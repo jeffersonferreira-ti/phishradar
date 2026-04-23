@@ -65,4 +65,58 @@ def test_multiple_combined_signals_return_high_risk() -> None:
         "Message uses urgent language to pressure the recipient.",
         "Message contains a suspicious domain pattern.",
         "Message requests credentials or payment action.",
+        "URL contains suspicious phishing-related keywords.",
+    ]
+
+
+def test_suspicious_url_keywords_raise_url_only_analysis() -> None:
+    analysis = analyze_content("https://example.com/login/verify/account")
+
+    assert analysis.score == 50
+    assert analysis.label == "SUSPICIOUS"
+    assert analysis.reasons == [
+        "URL contains suspicious phishing-related keywords.",
+        "URL structure includes suspicious phishing-related patterns.",
+    ]
+
+
+def test_high_risk_tld_requires_sensitive_context() -> None:
+    analysis = analyze_content("https://example.top/news")
+
+    assert analysis.score == 0
+    assert analysis.label == "LOW_RISK"
+    assert analysis.reasons == []
+
+
+def test_high_risk_tld_with_sensitive_context_is_flagged() -> None:
+    analysis = analyze_content("https://verify.top")
+
+    assert analysis.score == 40
+    assert analysis.label == "SUSPICIOUS"
+    assert analysis.reasons == [
+        "URL contains suspicious phishing-related keywords.",
+        "URL uses a higher-risk top-level domain for sensitive content.",
+    ]
+
+
+def test_brand_lookalike_detection_flags_leetspeak_domain() -> None:
+    analysis = analyze_content("https://paypa1.com")
+
+    assert analysis.score == 40
+    assert analysis.label == "SUSPICIOUS"
+    assert analysis.reasons == [
+        "URL appears to mimic a known brand name.",
+    ]
+
+
+def test_suspicious_query_parameters_raise_structure_signal() -> None:
+    analysis = analyze_content(
+        "https://example.com/home?session=abc123&redirect=login&token=xyz"
+    )
+
+    assert analysis.score == 50
+    assert analysis.label == "SUSPICIOUS"
+    assert analysis.reasons == [
+        "URL contains suspicious phishing-related keywords.",
+        "URL structure includes suspicious phishing-related patterns.",
     ]

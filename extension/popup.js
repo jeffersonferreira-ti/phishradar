@@ -9,6 +9,7 @@ const resultElement = document.getElementById("result");
 const scoreValueElement = document.getElementById("score-value");
 const labelValueElement = document.getElementById("label-value");
 const reasonsListElement = document.getElementById("reasons-list");
+const GENERIC_ANALYSIS_ERROR = "Could not analyze the content. Please try again.";
 
 function getCacheKey(url) {
   return `${CACHE_KEY_PREFIX}${url}`;
@@ -44,13 +45,25 @@ function showResult(result, message) {
     });
   } else {
     const listItem = document.createElement("li");
-    listItem.textContent = "No reasons returned.";
+    listItem.textContent = "No risk signals detected.";
     reasonsListElement.appendChild(listItem);
   }
 
   resultElement.classList.remove("hidden");
   statusElement.textContent = message || "Analysis complete.";
   statusElement.classList.remove("error");
+}
+
+function getAnalysisErrorMessage(error) {
+  if (!(error instanceof Error)) {
+    return GENERIC_ANALYSIS_ERROR;
+  }
+
+  if (error.message.startsWith("Analysis request failed with status")) {
+    return GENERIC_ANALYSIS_ERROR;
+  }
+
+  return error.message;
 }
 
 async function getCachedAnalysis(url) {
@@ -109,13 +122,9 @@ async function runAnalysis(content, loadingMessage) {
 
   try {
     const result = await analyzeContent(normalizedContent);
-    showResult(result);
+    showResult(result, "Analysis complete.");
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Could not complete the analysis.";
-    showError(message);
+    showError(getAnalysisErrorMessage(error));
   } finally {
     analyzeTabButton.disabled = false;
     analyzeTextButton.disabled = false;
@@ -126,14 +135,21 @@ async function analyzeUrlWithCache(url, loadingMessage) {
   const cachedAnalysis = await getCachedAnalysis(url);
 
   if (cachedAnalysis?.result) {
-    showResult(cachedAnalysis.result, "Loaded cached analysis for this page.");
+    showResult(cachedAnalysis.result, "Loaded analysis for the current page.");
     return;
   }
 
   setLoading(true, loadingMessage);
-  const result = await analyzeContent(url);
-  await saveCachedAnalysis(url, result);
-  showResult(result, "Analysis complete.");
+  try {
+    const result = await analyzeContent(url);
+    await saveCachedAnalysis(url, result);
+    showResult(result, "Analysis complete.");
+  } catch (error) {
+    showError(getAnalysisErrorMessage(error));
+  } finally {
+    analyzeTabButton.disabled = false;
+    analyzeTextButton.disabled = false;
+  }
 }
 
 async function loadActiveTabAnalysis() {
@@ -142,21 +158,15 @@ async function loadActiveTabAnalysis() {
     const tabUrl = activeTab.url;
 
     if (!isSupportedUrl(tabUrl)) {
-      statusElement.textContent = "Open an http(s) page to see automatic analysis.";
       resultElement.classList.add("hidden");
+      statusElement.textContent = "Open an http(s) page to view automatic analysis.";
+      statusElement.classList.remove("error");
       return;
     }
 
     await analyzeUrlWithCache(tabUrl, "Analyzing current page...");
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Could not load the current page analysis.";
-    showError(message);
-  } finally {
-    analyzeTabButton.disabled = false;
-    analyzeTextButton.disabled = false;
+    showError(getAnalysisErrorMessage(error));
   }
 }
 
@@ -172,11 +182,7 @@ analyzeTabButton.addEventListener("click", async () => {
 
     await analyzeUrlWithCache(tabUrl, "Analyzing current tab...");
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Could not read the current tab.";
-    showError(message);
+    showError(getAnalysisErrorMessage(error));
   }
 });
 
